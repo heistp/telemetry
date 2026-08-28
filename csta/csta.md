@@ -3,11 +3,6 @@ SPDX-License-Identifier: GPL-3.0-or-later
 Copyright 2026 Pete Heist
 -->
 
-Tasks:
-- write somewhere about tenants sharing a single queue
-- POTENTIAL NAME: Castanet
-  - Network Capacity Sharing with Time Accumulation
-
 # Capacity Sharing with Time Accumulation
 <p align="right">
 Pete Heist<br/>
@@ -216,11 +211,11 @@ two RTTs.
   P<sub>flow</sub> / P<sub>bottleneck</sub>.  With an empty bottleneck we can
   jump quickly to capacity.
 
-![Single flow, 10 Mbps, 20 ms RTT](images/f1-oneflow-10mbps-20ms.png)
+![Single flow, 10 Mbps, 20 ms RTT](images/f1a-oneflow-10mbps-20ms.png)
 
 *Figure 1a: Single flow, 10 Mbps, 20 ms RTT*
 
-![Single flow, 100 Gbps, 600 ms](images/f1-oneflow-100gbps-600ms.png)
+![Single flow, 100 Gbps, 600 ms](images/f1b-oneflow-100gbps-600ms.png)
 
 *Figure 1b: Single flow, 100 Gbps, 600 ms RTT*
 
@@ -231,7 +226,7 @@ a full fair share of 1.0, and the other a one-half share of 0.5.  The flows find
 and maintain their rates of 600 Mbps and 300 Mbps.  In the IP Throughput plot,
 the red trace is the total throughput.
 
-![Two flows with portions 1.0 and 0.5, 1 Gbps, 20 ms RTT](f2a-twoflow-mixed-portion.png)
+![Two flows with portions 1.0 and 0.5, 1 Gbps, 20 ms RTT](images/f2a-twoflow-mixed-portion.png)
 
 *Figure 2a: Two flows with portions 1.0 and 0.5, 1 Gbps, 20 ms RTT*
 
@@ -239,7 +234,7 @@ In Figure 2b we see two flows with different RTTs.  They have both requested a
 fair share, so they compete fairly in the bottleneck, with 450 Mbps each.  The
 queue length stays around 1-2 packets.
 
-![Two flows, 10 ms RTT vs 100 ms RTT, 1 Gbps](f2b-twoflow-mixed-rtt.png)
+![Two flows, 10 ms RTT vs 100 ms RTT, 1 Gbps](images/f2b-twoflow-mixed-rtt.png)
 
 *Figure 2b: Two flows, 10 ms RTT vs 100 ms RTT, 1 Gbps*
 
@@ -249,7 +244,7 @@ In Figure 3a, we see 16 flows started simultaneously.  Aside from a brief 0.2 ms
 queue spike at flow start, the flows accurately find their pacing rates of 56.25
 Mbps (900 / 16), and maintain a steady state of around 3-5 packets in the queue.
 
-![16 flow simultaneous start, 1 Gbps, 20 ms RTT](f3a-16-flows-1gbps.png)
+![16 flow simultaneous start, 1 Gbps, 20 ms RTT](images/f3a-16-flows-1gbps.png)
 
 *Figure 3a: 16 flow simultaneous start, 1 Gbps, 20 ms RTT*
 
@@ -257,7 +252,7 @@ In Figure 3b, we see 1000 flows started simultaneously in a 10 Gbps bottleneck.
 This causes a ~1 ms queue spike at flow start and a steady state of 3-4 packets
 in the queue.
 
-![1000 flow simultaneous start, 10 Gbps, 20 ms RTT](f3b-1000-flows-10gbps.png)
+![1000 flow simultaneous start, 10 Gbps, 20 ms RTT](images/f3b-1000-flows-10gbps.png)
 
 *Figure 3b: 1000 flow simultaneous start, 10 Gbps, 20 ms RTT*
 
@@ -267,7 +262,7 @@ for the rates to fully stabilize.  The reasons for this are not fully understood
 yet, but in general, higher bandwidths / packet rates seem to result in more
 precise rate control.
 
-![1000 flow simultaneous start, 100 mbps, 20 ms RTT](f3c-1000-flows-100mbps.png)
+![1000 flow simultaneous start, 100 mbps, 20 ms RTT](images/f3c-1000-flows-100mbps.png)
 
 *Figure 3c: 1000 flow simultaneous start, 100 mbps, 20 ms RTT*
 
@@ -278,11 +273,11 @@ a corresponding plot of the bottleneck's timeulator.  We see that the slope of
 the timeulator value corresponds to the number of allocated portions (in this
 case, flows, as they both have an equal, fair share portion).
 
-![Two flow staggered start, 1000 mbps, 10 ms RTT](f4a-twoflow-staggered.png)
+![Two flow staggered start, 1000 mbps, 10 ms RTT](images/f4a-twoflow-staggered.png)
 
 *Figure 4a: Two flow staggered start, 1000 mbps, 10 ms RTT*
 
-![Two flow staggered start, Timeulator](f4b-twoflow-staggered-timeulator.png)
+![Two flow staggered start, Timeulator](images/f4b-twoflow-staggered-timeulator.png)
 
 *Figure 4b: Two flow staggered start, Timeulator*
 
@@ -292,7 +287,7 @@ its rate to fair share until the 600 ms RTT flow becomes aware of it via the
 timeulator and reduces its rate.  There is a 2 ms queue spike as the second flow
 hits its rate which needs investigation.  
 
-![Two flow staggered start, 1000 mbps, 600 ms vs 5 ms RTT](f4c-twoflow-staggered-mixed-rtt.png)
+![Two flow staggered start, 1000 mbps, 600 ms vs 5 ms RTT](images/f4c-twoflow-staggered-mixed-rtt.png)
 
 *Figure 4c: Two flow staggered start, 1000 mbps, 600 ms vs 5 ms RTT*
 
@@ -307,7 +302,7 @@ the ratio of their rates is 4:2:1, according to their portions.
 | 2    | Red   | 0.25    | 10-20 s |
 | 3    | Blue  | 0.1     | 15-25 s |
 
-![Four flow staggered start with varied portions, 1000 mbps, 10 ms RTT](f4d-4flow-staggered.png)
+![Four flow staggered start with varied portions, 1000 mbps, 10 ms RTT](images/f4d-4flow-staggered.png)
 
 *Figure 4d: Four flow staggered start with varied portions, 1000 mbps, 10 ms RTT*
 
