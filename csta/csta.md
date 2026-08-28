@@ -111,17 +111,17 @@ Senders pass Σ<sub>inc</sub> to the network at regular intervals.  For maximum
 precision, this can be with every packet. Σ<sub>inc</sub> is calculated as
 follows, where Δt is the elapsed time since Σ<sub>inc</sub> was previously sent.
 
-$Σ_\text{inc} = P_\text{flow} * Δt
+$Σ_\text{inc} = P_\text{flow} * Δt$
 
 Senders can determine P<sub>bottleneck</sub> for the period between any two
 points in time as follows:
 
-$P_\text{bottleneck} = ΔΣ / Δt
+$P_\text{bottleneck} = ΔΣ / Δt$
 
 With P<sub>bottleneck</sub> available, senders know their allocated share of
 capacity:
 
-$R_\text{flow} = C * P_\text{flow} / P_\text{bottleneck}
+$R_\text{flow} = C * P_\text{flow} / P_\text{bottleneck}$
 
 ### Packet Fields
 
@@ -164,12 +164,12 @@ Senders must:
 
 The rate for each hop is:
 
-$R_\text{hop} = C_\text{hop} * P_\text{flow} / P_\text{hop}
+$R_\text{hop} = C_\text{hop} * P_\text{flow} / P_\text{hop}$
 
 Once the minimum rate is identified (R<sub>bottleneck</sub>), this rate is used
 to calculate a portion for each hop as follows:
 
-$P_\text{flow-hop} = P_\text{hop} * R_\text{bottleneck} / C_\text{hop}
+$P_\text{flow-hop} = P_\text{hop} * R_\text{bottleneck} / C_\text{hop}$
 
 Next, this per-hop portion is used to calculate a per-hop timeulator increment
 per the formula for Σ<sub>inc</sub> in [The Timeulator](#the-timeulator).  This
