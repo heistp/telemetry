@@ -196,8 +196,8 @@ capacity.
 ### Single Flow
 
 Figures 1a and 1b show single flow tests with two very different RTTs and
-bottleneck capacities.  In both cases, the pacing rate is near capacity after
-two RTTs.
+bottleneck capacities (Figure 1a - 10 Mbps @ 20 ms RTT, Figure 1b - 100 Gbps @
+600 ms RTT).  In both cases, the pacing rate is near capacity after two RTTs.
 
 * **RTT 0**: Connection negotiation (SYN/SYN-ACK).  After negotiation we have
   the bottleneck capacity and baseline values for bottleneck sent bytes and
