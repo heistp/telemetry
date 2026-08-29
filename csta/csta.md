@@ -188,6 +188,10 @@ The receiver must reflect the unmodified telemetry from any hops back to the
 sender.  If the telemetry must be merged at any time, the lastest values from
 each hop should be used.
 
+### Capacity Slack
+
+TODO Write this section
+
 ## Simulations
 
 In all simulations, the maximum allocated capacity is 90% of the bottleneck
@@ -308,40 +312,68 @@ the ratio of their rates is 4:2:1, according to their portions.
 
 ### Bottleneck Rate Changes
 
-TODO
+Figures 5a and 5b show two flows with portions 1.0 and 0.5, in a bottleneck with
+maximum rates typical for WiFi 6 (802.11ax).  The rate is adjusted during the
+test as follows:
 
-- WiFi 802.11ax scenario
-  Two flows, 1.0 and 0.5
-  RTT 10ms or 20ms, 35 second test
-  var RateInit = 300 * Mbps
-  var RateSchedule = []RateAt{
-  	RateAt{Clock(5 * time.Second), RateInit * 9 / 10},
-  	RateAt{Clock(10 * time.Second), RateInit},
-  	RateAt{Clock(15 * time.Second), RateInit / 2},
-  	RateAt{Clock(20 * time.Second), RateInit},
-  	RateAt{Clock(25 * time.Second), RateInit / 5},
-  	RateAt{Clock(30 * time.Second), RateInit},
-  }
+| Time (sec) | Rate (% of full) |
+|------------|------------------|
+| 0          | 100%             |
+| 5          | 90%              |
+| 10         | 100%             |
+| 15         | 50%              |
+| 20         | 100%             |
+| 25         | 20%              |
+| 30         | 100%             |
+
+The flows are quick to react to rate changes because they see the capacity
+change in the bottleneck's telemetry.  While the queue spike at T=5 is not
+visible as it's absorbed by the capacity slack, the spikes at T=15 and T=25 are
+due to data already in flight when the rate drop occurs.
+
+Real world performance with WiFi would likely differ due to its bursty nature.
+
+![Two flows, WiFi 6 approximation, 20 MHz channels, 143 Mbps, 10 ms RTT](images/f5a-wifi6-20mhz.png)
+
+*Figure 5a: Two flows, 1.0/0.5, WiFi 6 approximation, 20 MHz channels, 143 Mbps, 10 ms RTT*
+
+![Two flows, WiFi 6 approximation, 160 MHz channels, 1200 Mbps, 10 ms RTT](images/f5b-wifi6-160mhz.png)
+
+*Figure 5b: Two flows, 1.0/0.5, WiFi 6 approximation, 160 MHz channels, 1200 Mbps, 10 ms RTT*
 
 ### Fixed Rate Flows
 
-TODO
+Figure 6 shows a fixed rate 20 Mbps flow in competition with a fair-share flow.
+The 100 Mbps bottleneck has a 50% rate drop at T=5 sec, and a 75% rate drop
+(from the initial rate) at T=10 sec.  The rate of 20 Mbps is maintained until
+the capacity and competing flows no longer allow it.  Between T=10 and T=15, the
+available capacity of 22.5 Mbps ($100 Mbps * 0.9 * 0.25$) is shared equally
+between the two flows.
 
-- 100 Mbps bottleneck
-  50% then 80% rate drop
-  1 flow fixed 20 Mbps
-  1 flow 1.0
-  RTT 10-20ms
-  explain pacing at both bitrates
+![Fixed rate 20 Mbps flow vs fair-share flow, 100 Mbps bottleneck with varying rate, 20 ms RTT](images/f6-fixed-rate-20mbps.png)
+
+*Figure 6: Fixed rate 20 Mbps flow vs fair-share flow, 100 Mbps bottleneck with varying rate, 20 ms RTT*
 
 ### Precision vs Capacity
 
-TODO
+This section illustrates the general concept that higher rate bottlenecks have
+the potential for lower sojourn times and more precise rate control, however it
+also shows a problem with the current CSTA CCA.  In general, as the number of
+flows goes up, the bandwidth goes down and the RTT goes down, we see queue
+inflation, where the aggregate rate is greater than the target, and there are
+periodic oscillations in the queue.  This needs further investigation.
 
-- Show that higher bandwidths increase precision
-- 1000 flows, 10ms, 1000 Mbps vs 10000 Mbps vs 100 Mbps
-  - 10 Gbps shows increased precision
-  - 100 Mbps shows oscillation - unexplained
+![1000 flows, 1 Gbps, 10 ms RTT](images/f7a-1000-flows-1gbps-10ms.png)
+
+*Figure 7a: 1000 flows, 1 Gbps, 10 ms RTT*
+
+![1000 flows, 10 Gbps, 10 ms RTT](images/f7b-1000-flows-10gbps-10ms.png)
+
+*Figure 7b: 1000 flows, 10 Gbps, 10 ms RTT*
+
+![1000 flows, 100 Mbps, 10 ms RTT](images/f7c-1000-flows-100mbps-10ms.png)
+
+*Figure 7c: 1000 flows, 100 Mbps, 10 ms RTT*
 
 ## Challenges and Caveats
 
@@ -356,19 +388,19 @@ While this is similar to unresponsive senders that can fill FIFO queues on
 today's Internet, with CSTA, the attacker does not have to expend significant
 resources to execute the attack.
 
-One way to mitigate timeulator abuse is to segment traffic by "self-interested
-entities" where appropriate, where an entity is any part of the network with
-sufficiently aligned interests.  There is no incentive for an entity to harm
-itself.  Entities could be separated either with separate, scheduled queues, or
-in a single queue by allocating each entity a portion of capacity, and dropping
-traffic sent above that capacity.
+One way to mitigate timeulator abuse is to segment traffic by "entities" where
+appropriate, where an entity is any part of the network with sufficiently
+aligned interests.  There is no incentive for an entity to harm itself.
+Entities could be placed either in separate, scheduled queues, or in a single
+queue by allocating each entity a portion of capacity, and dropping traffic sent
+above that capacity.
 
 Another way to mitigate abuse is to use flow awareness to determine if any flow
-(where the definition could include just L3 headers, or L3+L4) is either
+(where the definition could include e.g. L3 headers, or L3+L4) is either
 incrementing the timeulator for capacity they're not using, or using more
 capacity than they're allocating.  The math is fairly straightforward to
-determine this, but it's an extra burden on the network to have to track and
-control each flow.
+determine this, but it would be an extra burden on the network to have to track
+and control each flow.
 
 ### Jitter
 
