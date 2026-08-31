@@ -24,7 +24,7 @@ below the maximum, queueing occurs only to absorb transient bursts.
 A number of challenges persist in Internet congestion control, including:
 
 - CCAs (congestion control algorithms) that do not scale well to modern
-  bandwidths
+  bandwidths (capacities)
 - CCAs that overreact to loss
 - TCP slow start that can be slow to ramp to capacity, while often inflating the
   queue at exit
