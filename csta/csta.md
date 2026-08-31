@@ -4,6 +4,7 @@ Copyright 2026 Pete Heist
 -->
 
 # Capacity Sharing with Time Accumulation
+
 <p align="right">
 Pete Heist<br/>
 Rodney Grimes<br/>
@@ -13,70 +14,63 @@ August 31, 2026
 ## Abstract
 
 CSTA (Capacity Sharing with Time Accumulation) provides bottleneck capacity
-sharing by using network telemetry with a single fed back counter.  With CSTA,
-CCAs (congestion control algorithms) can safely set their rate, independent of
-RTT, to the maximum target rate or fair share, in as few as 2 RTTs.  With a
-target rate below maximum capacity, the goal is for queueing to occur only to
-absorb short term bursts.
+sharing using a shared time accumulator in the network.  With networks that
+support CSTA, senders can safely increase their rate to the bottleneck's fair
+share in as few as 2 RTTs, independent of capacity.  With a target capacity
+below the maximum, queueing occurs only to absorb transient bursts.
 
 ## Introduction
 
 A number of challenges persist in Internet congestion control, including:
 
-- CCAs that do not scale well to modern bandwidths
+- CCAs (congestion control algorithms) that do not scale well to modern
+  bandwidths
 - CCAs that overreact to loss
-- TCP slow start that is both slower than it could be to ramp to capacity, while
-  often inflating the queue at exit
+- TCP slow start that can be slow to ramp to capacity, while often inflating the
+  queue at exit
 - CCAs that build queue by design, leading to large queueing delays when
-  paired with oversized buffers
+  operating in oversized buffers
 - lack of flow fairness between disparate CCAs and across RTTs
 - congestion window growth without regard to the number of flows
 
-First we observe that many of the above problems stem from the fact that the
-Internet was designed with strict adherence to the end-to-end principle, with
-smart edges and a dumb core.  This has good reasons, including scalability,
-simplicity, and flexibility in the network, but it leaves endpoints to make hard
-performance tradeoffs.  There is no way for senders to seek maximum capacity or
-fair share quickly, and it can be difficult to distinguish between queueing and
-path delays.  Experiments with ECN and network telemetry are starting to bend
-these rules.
+Many of the above problems stem from the fact that the Internet was designed
+with strict adherence to the end-to-end principle, with smart edges and a dumb
+core.  This has good reasons, including scalability, simplicity, and flexibility
+in the network, but it leaves endpoints to make hard performance tradeoffs.
+Senders are left to probe for maximum capacity and discover their fair share,
+and it can be difficult to distinguish between queueing and path delays.
+Experiments with [ECN](https://www.rfc-editor.org/info/rfc3168/) and network
+telemetry are starting to bend these rules.
 
-As an experiment, we aim to design a cooperating system of endpoints and hops
-(switches, routers, etc.) that:
+While it's possible to design a system of explicit capacity reservations, where
+flows are allocated, tracked and de-allocated in the network, it would be a
+significant burden on the network to have to do so.  With CSTA, we use elapsed
+time and a shared "time accumulator" as a way for flows to coordinate, along
+with some basic network telemetry.  As such, flows can quickly determine their
+target rate, and do not need to build a queue to do so.  The features of CSTA
+are:
 
-- allows senders to continually seek maximum or fair share capacity as quickly
-  as possible, independent of RTT
-- minimizes queueing delay
-- places a minimum burden on the network
-
-While it's possible to design an explicit system with capacity reservations,
-where flows are allocated, tracked and de-allocated in the network, it would be
-a significant burden on the network to have to do so.  Instead of this, we
-require hops only to send some basic network telemetry, and to maintain a single
-counter, the [timeulator](#the-timeulator), that's fed back to senders and used
-to coordinate capacity sharing.
-
-The features of CSTA are:
-
-- Flows can quickly and safely set their rate to their requested portion of
-  capacity, independent of RTT
+- Flows can quickly and safely set their rate to a requested portion of
+  capacity, in as few as 2 RTTs.
+- Flows compete fairly for capacity, independent of RTT.
 - Multiple flows can start simultaneously, yet safely, with minimal impact on
-  the queue
-- The utilized capacity at each hop may be kept somewhat below the maximum,
-  minimizing the queue impact from short term bursts
-- All traffic can coexist in a single queue and no flow awareness is required
-  in the network ([security](#security) considerations aside)
+  the queue.
+- The utilized capacity at each hop can be kept somewhat below the maximum (see
+  [capacity slack](#capacity-slack)), minimizing queueing delay.
+- All traffic can coexist in a single queue, without flow awareness in the
+  network, and with minimal computation ([security](#security) considerations
+  aside).
 
 ## Scope and Limitations
 
-CSTA is currently an experimental system with no proposed avenue for deployment.
-The use of a feedback variable from the network raises important questions about
-[security](#security).  Testing has thus far verified that the capacity sharing
-mechanism, the timeulator, can work in principle, but not how well it would work
-in real world networks with [jitter](#jitter), [loss](#loss) and
-[multiple hops](#multiple-hops).  Finally, there is no proposed mechanism for
-coexistence with existing Internet traffic.  All of the above are potential
-topics for future research.
+CSTA is currently an experimental concept with no scope for deployment yet.
+Idealized simulations have verified that the capacity sharing mechanism can
+work, but not how well it would work in real world networks with
+[jitter](#jitter), [loss](#loss), [multiple hops](#multiple-hops) and [high flow
+churn](#high-flow-churn).  The use of a feedback variable from the network
+raises questions about [security](#security).  Finally, no attention has yet
+been given to coexistence with existing Internet traffic, or operation with
+non-CSTA bottlenecks.  All of the above are potential topics for future R&D.
 
 # Architecture
 
@@ -128,22 +122,23 @@ $R_\text{flow} = C * P_\text{flow} / P_\text{bottleneck}$
 Fields required for **output** telemetry, from each hop, for reflection back to
 the sender:
 
-- Hop ID <sup>3</sup>
-- 64-bit capacity (bytes/sec) <sup>4</sup>
-- 64-bit timeulator (nanoseconds)
-- 64-bit total sent bytes
+- 8-bit hops left <sup>3</sup>
+- 56-bit hop ID <sup>3</sup>
+- 64-bit capacity allocated to CSTA traffic (bytes/sec) <sup>4</sup>
+- 64-bit [timeulator](#timeulator) (nanoseconds)
+- 64-bit total sent bytes for CSTA traffic
 
 Fields required as **input** to the network, for each hop:
 
-- Hop ID <sup>3</sup>
-- 64-bit timeulator increment (Σ<sub>inc</sub>)
+- 8-bit hops left <sup>3</sup>
+- 56-bit hop ID <sup>3</sup>
+- 64-bit [timeulator](#timeulator) increment (Σ<sub>inc</sub>)
 
-<sup>3</sup> The specification for hop ID is intentionally vague, as this may
-be an index or identifier.  See [Hop ID](#hop-id) for more details.
+<sup>3</sup> See also [Hop ID](#hop-id).
 
 <sup>4</sup> The advertised capacity is typically somewhat less than the maximum
-to allow some capacity slack, for absorbing small bursts without any queueing
-delay.
+to allow some [capacity slack](#capacity-slack), for absorbing small bursts
+without any queueing delay.
 
 ### Hop Requirements
 
@@ -175,12 +170,16 @@ Next, this per-hop portion is used to calculate a per-hop timeulator increment
 per the formula for Σ<sub>inc</sub> in [The Timeulator](#the-timeulator).  This
 is passed for each hop as input to the network.
 
-We note that senders can also allocate capacity for fixed-rate flows that stay
-within a given requested fair-share portion.  The formula above for
-P<sub>flow-hop</sub> is used, with R<sub>bottleneck</sub> replaced with the
-fixed rate.  If the resulting P is greater than the fair-share portion limit
-(e.g. 1.0), then the rate must be scaled down proportionally, and the sender
-will be aware of this before having to suffer congestion to determine it.
+Senders can also allocate capacity for fixed-rate flows that stay within a given
+requested fair-share portion.  The formula above for P<sub>flow-hop</sub> is
+used, with R<sub>bottleneck</sub> replaced with the fixed rate.  If the
+resulting P is greater than the fair-share portion limit (e.g. 1.0), then the
+rate must be scaled down proportionally, and the sender will be aware of this
+before having to suffer congestion to determine it.
+
+Senders should also place a cap on their send rate based on the capacity and
+utilization of the local interface.  In Linux, this is done with BQL and TCP
+small queues.
 
 ### Receiver Requirements
 
@@ -190,12 +189,19 @@ each hop should be used.
 
 ### Capacity Slack
 
-TODO Write this section
+The available capacity is advertised in each hop's network telemetry.  By
+allowing the capacity to be set in the network, it's configurable in one place
+and makes it a matter of network policy.
+
+Administrator may allocate all of part of a hop's capacity to CSTA, or some
+fraction of the maximum capacity for variable rate link layers.  Leaving some
+capacity slack (available capacity) is recommended so that short term bursts
+can be absorbed with little or no additional queueing.
 
 ## Simulations
 
 In all simulations, the maximum allocated capacity is 90% of the bottleneck
-capacity.
+capacity, leaving a [capacity slack](#capacity-slack) of 10%.
 
 ### Single Flow
 
@@ -263,8 +269,8 @@ in the queue.
 For a more degenerate case, Figure 3c shows 1000 flows in a 100 Mbps bottleneck.
 There is a larger spike of over 100 ms at flow start, and it takes ~15 seconds
 for the rates to fully stabilize.  The reasons for this are not fully understood
-yet, but in general, higher bandwidths / packet rates seem to result in more
-precise rate control.
+yet, but in general, higher packet rates seem to result in more precise rate
+control.
 
 ![1000 flow simultaneous start, 100 mbps, 20 ms RTT](images/f3c-1000-flows-100mbps.png)
 
@@ -359,7 +365,7 @@ between the two flows.
 This section illustrates the general concept that higher rate bottlenecks have
 the potential for lower sojourn times and more precise rate control, however it
 also shows a problem with the current CSTA CCA.  In general, as the number of
-flows goes up, the bandwidth goes down and the RTT goes down, we see queue
+flows goes up, the capacity goes down and the RTT goes down, we see queue
 inflation, where the aggregate rate is greater than the target, and there are
 periodic oscillations in the queue.  This needs further investigation.
 
@@ -375,10 +381,10 @@ periodic oscillations in the queue.  This needs further investigation.
 
 *Figure 7c: 1000 flows, 100 Mbps, 10 ms RTT*
 
-## Challenges and Caveats
+## Discussion and Challenges
 
-All topics in this section require more research to resolve concretely.  They
-are here for discussion and awareness.
+Topics in this section may require more research to resolve concretely.  They
+are here for discussion and to acknowledge that we're aware of them.
 
 ### Security
 
@@ -411,68 +417,95 @@ by running the control loop less often so there are more samples for calculating
 the bottleneck portions and rate.  This will have to be explored in real world
 networks.
 
+### High Flow Churn
+
+When there are many short flows starting and stopping in a bottleneck, high flow
+churn will mean a variable timeulator rate, and thus calculation for the number
+of bottleneck portions.  Short flow testing will be required in a realistic
+network simulator to determine how CSTA CCAs handle this.
+
 ### Multiple Hops
 
-All simulations thus far were done with a single hop.  In the
-[Architecture](#architecture) section, we propose handling multiple hops by
-appending telemetry at each hop, and having the sender calculate and send
-per-hop timeulator increments.
+Any hop which has no chance of becoming a bottleneck (it's overprovisioned) does
+not need CSTA deployed.  However, there are cases where CSTA may need to be
+deployed on multiple hops on a path.
 
-Ideally, telemetry from only one hop would be needed, and each hop could quickly
-determine if it needed to overwrite that telemetry, however at present this
-would require both additional fields from the sender, and more computation in
-the network.  We will not work through the details of this, as so far the
-solution does not meet the goal of minimizing the burden in the network.
-
-Any hop which is sufficiently overprovisioned and has no chance of becoming a
-bottleneck does not need CSTA deployed.  If on a controlled network it can be
-ensured that only one hop is the bottleneck, then only one needs to have CSTA
-deployed.
+In the [Architecture](#architecture) section, we propose handling multiple hops
+by appending telemetry at each hop, and having the sender calculate and send
+per-hop timeulator increments.  Ideally, telemetry from only one hop would be
+needed, and each hop could overwrite that telemetry when it knew that it's the
+bottleneck.  However, this would require both additional info from the sender
+and more computation in the network, and that is why this approach was avoided.
 
 ### Non-CSTA Bottlenecks
 
-The current CSTA architecture does not support having non-CSTA bottlenecks in
-the network.  The main problem is that if a hop with CSTA support advertises a
-capacity that's higher than another non-CSTA hop on the path, it will lead to
-immediate congestion, and there's currently no provision for handling that.
+The current CSTA architecture does not support having non-CSTA **bottlenecks**
+in the network (non-CSTA hops are OK, see [Multiple Hops](#multiple-hops)).  The
+problem is that if a hop with CSTA advertises a capacity that's higher than
+another non-CSTA hop on the path, it will lead to congestion, and there's
+currently no provision for handling that.  This may be addressed in the future.
+
+### Non-CSTA Flows
+
+Some flows may not need to make CSTA allocations (i.e. don't need to send
+timeulator increments), such as low rate ICMP echo requests, or other low rate
+control packets.  These can be absorbed by the [capacity slack](#capacity-slack).
+
+It is not yet known how conventional capacity-seeking TCP flows will behave
+together with CSTA traffic in a CSTA bottleneck.  In theory, they will behave
+however TCP does when competing with rate-limited, unresponsive traffic.  More
+research is needed on this.
 
 ### Loss
 
-Packet loss is not explored in our current simulations.  There are two cases
-depending on where the loss occurs:
+Packet loss is not explored in our current simulations, but we do not expect it
+to cause a major challenge.  Loss can occur in one of two positions in the
+network:
 
 1.  If loss occurs **before a hop**, its timeulator increment is missed, so
     senders may slightly underestimate the number of bottleneck capacity
     portions, and thus slightly overestimate their send rate.  On the other
     hand, since the packet was lost before the hop, it has not contributed to
-    the hop's utilized capacity, so not increasing the timeulator may be
-    considered appropriate.  Heavy loss on the forward path should result in a
-    flow occupying less of the capacity than it requests, and other flows should
+    the hop's utilized capacity, so not increasing the timeulator is
+    appropriate.  Heavy loss on the forward path should result in a flow
+    occupying less of the capacity than it requests, and other flows should
     correctly occupy that unused capacity.
 2.  If loss occurs **after a hop**, either on the way to the receiver, or on the
     return path, the timeulator will be incremented and the hop capacity
     utilized, but affected senders will see a temporary delay in their
-    timeulator increment.  However, because the timeulator value is cumulative,
-    the next telemetry update from the hop will accurately correct the
-    imprecision.  Heavy loss on the return path should merely result in a less
-    precise estimation at the sender of the bottleneck portions which is
-    continually corrected over time.
+    timeulator increment.  Fortunately, the timeulator value is cumulative, so
+    it will be corrected on the next update.  Heavy loss on the return path
+    should merely result in a less precise estimation at the sender of the
+    bottleneck portions, which is continually corrected over time.
 
 Although both of these cases seem reasonable theoretically, they will need
 testing in real world networks.
 
 Since the requirement with CSTA is that all potential bottlenecks in the network
 have CSTA support to control send rates, we see no reason for senders to reduce
-their rate in response to packet loss.
+their rate in response to packet loss.  This may change if support for non-CSTA
+bottlenecks is added.
+
+### Timer Precision
+
+Endpoints require high precision timing to calculate timeulator increments and
+measure the bottleneck portions.  The
+[TSC](https://en.wikipedia.org/wiki/Time_Stamp_Counter) instruction has been in
+most CPUs since 2008, but CSTA could be challenging to implement on older
+devices.
+
+High precision timing is not required in the **network**, unless the timeulator
+needs to be monitored to implement additional [security](#security) features.
 
 ### Packet Inflation
 
-With more information, flows may know the send rate, but not their actual impact
-on any given hop, as their packets may have been encapsulated before they
-reached the hop.  There are two alternatives for handling this:
+Flows know their send rate, but not their actual rate seen by any given hop, as
+their packets may have been inflated by encapsulated before they reached the
+hop.  There are two alternatives for handling this:
 
 1.  Add a Packet Length field to the output telemetry from the hop.  Senders can
-    use this to reduce their send rate to compensate for the inflation.
+    use this to reduce their send rate to compensate for the inflation.  This is
+    under consideration.
 2.  Allow the additional packet inflation to be absorbed by the
     [Capacity Slack](#capacity-slack).  The effectiveness of this is constrained
     by how much packet inflation occurs, and how much slack has been configured.
@@ -480,12 +513,12 @@ reached the hop.  There are two alternatives for handling this:
 ### Hop ID
 
 CSTA needs some way to identify each hop so that the sender can send per-hop
-timeulator increments.  There are several possible approaches to doing so:
+timeulator increments.  Several options were considered:
 
 1.  Hop IDs are positional indexes, with operation similar to the Segments
     Left field in [RFC8754](https://datatracker.ietf.org/doc/html/rfc8754), so
-    that hops can access their input data directly.  This is performant, but not
-    resilient to path changes.
+    that hops can access their input data directly.  This is performant, but by
+    itselt is not resilient to path changes.
 2.  Hop IDs are randomly generated values.  This is resilient to path changes,
     but requires each hop to search for its hop ID in each packet to get the
     input data it needs.
@@ -495,19 +528,25 @@ timeulator increments.  There are several possible approaches to doing so:
     correct.  If not, they search the other entries by hop ID.  That makes the
     lookup positional a vast majority of the time.
 
-The selection of which type of hop ID to use will also depend on deployment
-scope.  In controlled environments, positional hop IDs may be sufficient.
+Option 3 was chosen for now, however this may change with experience and once
+the deployment scope is known.  In controlled environments with
+[SRv6](https://www.rfc-editor.org/info/rfc8986/), for example, positional
+indexes alone may be sufficient.
 
-### Control Loop Interval
+### Control Loop Challenges
 
 One challenge in simulation has been determining the right control loop interval
 at the sender.  Too short, and the determination of bottleneck rate and portions
 can be imprecise, resulting in poor rate control to the point of instability.
-Too long, and the rate convergence time is unnecessarily delayed.
+Too long, and the rate convergence time is unnecessarily delayed.  The current
+implementatation does not work in all cases.  High RTT flows for example need
+longer control loop intervals.
 
 More work is needed on the control loop in general to determine what if anything
-needs to be smoothed, and exactly how often it should run.  High RTT flows for
-example appear to need longer control loop intervals.
+needs to be smoothed, and exactly how often it should run.  We envision a more
+modular architecture with estimators for the bottleneck rate and portions, and
+for the control loop to run when it has sufficient confidence in the
+estimations.
 
 ### Low RTT Flows
 
@@ -515,32 +554,25 @@ In simulation, we see some effects at very low RTTs that need investigation.
 Specifically, we have seen queue inflation, overutilization and flow domination
 with flows in competition at an RTT of 20 μs.  In contrast we've seen
 underutilization for very small RTT flows in competition with higher RTT flows,
-e.g. 50 μs vs 20 ms.  Both issues need flushing out along with a full review of
-the control loop.
+e.g. 50 μs vs 20 ms.  Both issues need to be resolved along with a full review
+of the control loop.
 
 ### Timeulator Oscillations
 
 Fixed rate flows, as well we non-bottleneck capacity allocations, can introduce
-oscillations in the timeulator.  This is because in these cases, the portion
-used to determine the timeulator increment is determined dynamically rather than
-being fixed, and it adjusts according to conditions that the adjustment affects.
-This may produce an effect across multiple bottlenecks, so this needs to be
-investigated.  Appropriate smoothing of the calculated portion may be warranted
-or required to mitigate this.
+small oscillations in the timeulator.  This is because in these cases, the
+portion used to determine the timeulator increment is determined dynamically
+rather than being fixed, and it adjusts according to conditions that the
+adjustment affects.  The effect of this across multiple bottlenecks needs to be
+investigated.  Appropriate smoothing of the calculated portion may be needed to
+mitigate this.
 
-### No Initial Window
+### Initial Window
 
-Unlike conventional TCP, CSTA has no initial window (IW).  CSTA needs at least
-two RTTs to determine a sending rate, as the first RTT is used for connection
-negotiation, determining RTT, and getting baseline telemetry values.  The second
-RTT is needed to both send its initial timeulator increment to allocate
-capacity, and determine an initial estimation for the bottleneck's bitrate and
-timeulator rate (portions).
-
-Thus, conventional TCP may outperform CSTA in terms of FCT (flow completion
-time) for flows that are shorter than the TCP IW.  However, if the IW is
-inappropriately large for either the bottleneck rate or current conditions, then
-it can harm both FCT and latency.
-
-After the first two RTTs, CSTA has the potential to ramp up to its fair share
-rate far faster and more safely than conventional TCP.
+Unlike conventional TCP, CSTA can use an initial window (IW) of 1 packet and
+still get reasonable short flow performance.  However, CSTA needs at least 2
+RTTs to both send its initial timeulator increment, and estimate the
+bottleneck's bitrate and timeulator rate (portions).  If it's crucial to send
+data immediately in RTT 1, like IW, implementations may do so (and this **may**
+be absorbed by any capacity slack), but it's safest to increase the rate only
+after capacity becomes available.
