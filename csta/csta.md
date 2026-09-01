@@ -215,8 +215,11 @@ a fraction of the current maximum, which may change at any time (see
 
 ## Simulations
 
-In all simulations, the maximum allocated capacity is 90% of the bottleneck
-capacity, leaving a [capacity slack](#capacity-slack) of 10%.
+These simulations were made with [scim](https://github.com/heistp/scim), with
+the CCA implemented in
+[telemetry.go](https://github.com/heistp/scim/blob/main/telemetry.go) (see the
+CSTA struct).  In all simulations, the maximum allocated capacity is 90% of the
+bottleneck capacity, leaving a [capacity slack](#capacity-slack) of 10%.
 
 ### Single Flow
 
