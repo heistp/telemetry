@@ -379,10 +379,15 @@ between the two flows.
 
 This section illustrates the general concept that higher rate bottlenecks have
 the potential for lower sojourn times and more precise rate control, however it
-also shows a problem with the current CSTA CCA.  In general, as the number of
-flows goes up, the capacity goes down and the RTT goes down, we see queue
-inflation, where the aggregate rate is greater than the target, and there are
-periodic oscillations in the queue.  This needs further investigation.
+also shows a problem with the current CSTA CCA.
+
+In Figure 7a, we see 1000 flows in a 1 Gbps bottleneck.  The sojourn time stays
+below 2 ms.  In Figure 7b, we raise the bottleneck rate to 10 Gbps, and see a
+fraction of the sojourn time at steady state, well below 100 µS.
+
+However, in Figure 7c, with capacity reduced to 100 Mbps, we see queue inflation
+and oscillations.  In general, as the number of flows goes up, the capacity goes
+down and the RTT goes down, this can occur, and it needs further investigation.
 
 ![1000 flows, 1 Gbps, 10 ms RTT](images/f7a-1000-flows-1gbps-10ms.png)
 
