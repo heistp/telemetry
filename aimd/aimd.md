@@ -6,12 +6,13 @@ Rodney Grimes<br/>
 September 1, 2026
 </p>
 
-Before researching [CSTA](../csta/csta.md), we experimented with network
-telemetry using [scim](https://github.com/heistp/scim) to enhance conventional
-AIMD congestion control.  The results suggested that while AIMD is highly
-robust, there are limits to scalability (in terms of both capacity and RTT),
-that are hard to overcome without negatively impacting some other aspect of
-performance.
+Before researching
+[CSTA](https://github.com/heistp/telemetry/blob/main/csta/csta.md), we
+experimented with network telemetry using [scim](https://github.com/heistp/scim)
+to enhance conventional AIMD congestion control.  The results suggested that
+while AIMD is highly robust, there are limits to scalability (in terms of both
+capacity and RTT), that are hard to overcome without negatively impacting some
+other aspect of performance.
 
 In [telemetry.go](https://github.com/heistp/scim/blob/main/telemetry.go), there
 are two experimental CCAs we worked with, TCP Stuttgart and TCP Liberec.
@@ -89,5 +90,5 @@ caused the problem of wild swings in cwnd (i.e. jitter) for high RTT flows.
 There did not appear to be a good tradeoff to make here.
 
 The above experiments with AIMD were what led to the idea for
-[CSTA](../csta/csta.md), as we wanted something that would make a fundamental
-break from AIMD's limitations.
+[CSTA](https://github.com/heistp/telemetry/blob/main/csta/csta.md), as we wanted
+something that would make a fundamental break from AIMD's limitations.
